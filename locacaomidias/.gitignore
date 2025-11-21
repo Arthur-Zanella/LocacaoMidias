@@ -1,0 +1,28 @@
+# Binários
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Arquivos de ambiente
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependências
+/vendor/
+
+# Build
+/bin/
+/pkg/
+
+# Sistema
+.DS_Store
+Thumbs.db
