@@ -2,23 +2,25 @@ package routes
 
 import (
 	"locacaomidias/internal/handlers"
+	"net/http"
 
 	"github.com/gorilla/mux"
 )
 
-// InitRoutes inicializa o router da aplicação
+// InitRoutes inicializa o router
 func InitRoutes() *mux.Router {
 	router := mux.NewRouter()
 
-	router.HandleFunc("/api/estados", handlers.ListEstados).Methods("GET")
-	router.HandleFunc("/api/cidades", handlers.ListCidades).Methods("GET")
-	router.HandleFunc("/api/generos", handlers.ListGeneros).Methods("GET")
-	router.HandleFunc("/api/tipos", handlers.ListTipos).Methods("GET")
-	router.HandleFunc("/api/classificacoes-etarias", handlers.ListClassificacoesEtarias).Methods("GET")
-	router.HandleFunc("/api/classificacoes-internas", handlers.ListClassificacoesInternas).Methods("GET")
-	// Adicionar as rotas dos cadastros,
-	// Exemplo:
-	// router.HandleFunc("/atores", AtorHandler).Methods("GET", "POST")
+	apiRouter := router.PathPrefix("/api").Subrouter()
+	apiRouter.HandleFunc("/estados", handlers.ListEstados).Methods("GET")
+	apiRouter.HandleFunc("/cidades", handlers.ListCidades).Methods("GET")
+	apiRouter.HandleFunc("/generos", handlers.ListGeneros).Methods("GET")
+	apiRouter.HandleFunc("/tipos", handlers.ListTipos).Methods("GET")
+	apiRouter.HandleFunc("/classificacoes-etarias", handlers.ListClassificacoesEtarias).Methods("GET")
+	apiRouter.HandleFunc("/classificacoes-internas", handlers.ListClassificacoesInternas).Methods("GET")
+
+	fileServer := http.FileServer(http.Dir("./web"))
+	router.PathPrefix("/").Handler(fileServer)
 
 	return router
 }
