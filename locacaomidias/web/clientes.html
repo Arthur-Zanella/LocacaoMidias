@@ -9,7 +9,7 @@
 <body>
   <div class="container">
 
-    <!-- HEADER ================================================================ -->
+    <!-- Header -->
     <div class="card header">
       <div class="h-title">
         <svg width="34" height="34" viewBox="0 0 24 24">
@@ -27,7 +27,7 @@
       </div>
     </div>
 
-    <!-- FORM NOVO ============================================================= -->
+    <!-- Formulario -->
     <div class="card" id="formNovo" style="display:none;">
       <form id="novoForm">
         <div class="form-grid">
@@ -92,7 +92,7 @@
       </form>
     </div>
 
-    <!-- TABELA ================================================================ -->
+    <!-- Tabela -->
     <div class="card">
       <div class="table-wrap">
         <table id="tableClientes">
@@ -112,7 +112,7 @@
 
   </div>
 
-  <!-- MODAL EDITAR =========================================================== -->
+  <!-- MODAL EDITAR -->
   <div class="modal" id="modalEdit">
     <div class="modal-card">
 
@@ -201,12 +201,12 @@ async function loadClientes(){
   });
 }
 
-// Abrir formulário novo
+// Abrir formulário
 document.querySelector("#btnNovo").onclick = () => {
   document.querySelector("#formNovo").style.display = "block";
 };
 
-// Cancelar novo
+// Cancelar
 document.querySelector("#btnCancelar").onclick = () => {
   document.querySelector("#formNovo").style.display = "none";
 };

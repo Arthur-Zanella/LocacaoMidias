@@ -57,8 +57,5 @@ func InitRoutes() *mux.Router {
 	apiRouter.HandleFunc("/locacoes/{id}", handlers.UpdateLocacao).Methods("PUT")
 	apiRouter.HandleFunc("/locacoes/{id}", handlers.DeleteLocacao).Methods("DELETE")
 
-	// Em routes.go, adicionar:
-	apiRouter.HandleFunc("/locacoes/{id}/devolucao", handlers.RegistrarDevolucao).Methods("POST")
-
 	return router
 }

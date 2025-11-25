@@ -140,8 +140,8 @@ func (Exemplar) TableName() string {
 //locacao
 type Locacao struct {
 	ID         int           `json:"id" gorm:"primaryKey;column:id"`
-	DataInicio time.Time     `json:"data_inicio" gorm:"column:data_inicio"`
-	DataFim    time.Time     `json:"data_fim" gorm:"column:data_fim"`
+	DataInicio time.Time     `json:"data_inicio" gorm:"column:data_inicio;type:date"`
+	DataFim    time.Time     `json:"data_fim" gorm:"column:data_fim;type:date"`
 	Cancelada  bool          `json:"cancelada" gorm:"column:cancelada"`
 	ClienteID  int           `json:"cliente_id" gorm:"column:cliente_id"`
 	Cliente    Cliente       `json:"cliente,omitempty" gorm:"foreignKey:ClienteID"`
