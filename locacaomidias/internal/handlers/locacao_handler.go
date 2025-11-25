@@ -23,7 +23,7 @@ type locacaoInput struct {
 	DataFim    string `json:"data_fim"`
 	Cancelada  bool   `json:"cancelada"`
 	ClienteID  int    `json:"cliente_id"`
-	ExemplarID int    `json:"exemplar_codigo_interno"` // deve receber código do exemplar
+	ExemplarID int    `json:"exemplar_codigo_interno"`
 }
 
 // ---------------------------
@@ -48,6 +48,7 @@ func ListLocacoes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(locacoes)
 }
 
@@ -71,11 +72,12 @@ func GetLocacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(locacao)
 }
 
 // ---------------------------
-// CRIAR
+// CRIAR LOCAÇÃO
 // ---------------------------
 func CreateLocacao(w http.ResponseWriter, r *http.Request) {
 	var input locacaoInput
@@ -84,21 +86,38 @@ func CreateLocacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// obtém exemplar
-	var exemplar models.Exemplar
-	if err := database.DB.Preload("Midia.ClassificacaoInterna").
-		First(&exemplar, input.ExemplarID).Error; err != nil {
-		http.Error(w, "exemplar not found", http.StatusBadRequest)
+	// Parse datas
+	dataInicio := mustParse(input.DataInicio)
+	dataFim := mustParse(input.DataFim)
+
+	// Validar datas
+	if dataFim.Before(dataInicio) {
+		http.Error(w, "data_fim deve ser posterior a data_inicio", http.StatusBadRequest)
 		return
 	}
 
+	// 1. VERIFICAR SE EXEMPLAR EXISTE
+	var exemplar models.Exemplar
+	if err := database.DB.Preload("Midia.ClassificacaoInterna").
+		First(&exemplar, input.ExemplarID).Error; err != nil {
+		http.Error(w, "exemplar not found", http.StatusNotFound)
+		return
+	}
+
+	// 2. VERIFICAR SE EXEMPLAR ESTÁ DISPONÍVEL (só se locação NÃO for cancelada)
+	if !input.Cancelada && !exemplar.Disponivel {
+		http.Error(w, "exemplar não está disponível para locação", http.StatusConflict)
+		return
+	}
+
+	// 3. CRIAR LOCAÇÃO
 	valor := exemplar.Midia.ClassificacaoInterna.ValorAluguel
 
 	locacao := models.Locacao{
-		DataInicio: mustParse(input.DataInicio),
-		DataFim:    mustParse(input.DataFim),
+		DataInicio: dataInicio,
+		DataFim:    dataFim,
 		ClienteID:  input.ClienteID,
-		Cancelada:  false,
+		Cancelada:  input.Cancelada,
 	}
 
 	if err := database.DB.Create(&locacao).Error; err != nil {
@@ -106,6 +125,7 @@ func CreateLocacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 4. CRIAR ITEM DE LOCAÇÃO
 	item := models.ItemLocacao{
 		LocacaoID:      locacao.ID,
 		ExemplarCodigo: exemplar.CodigoInterno,
@@ -117,7 +137,16 @@ func CreateLocacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// recarrega locação completa
+	// 5. MARCAR EXEMPLAR COMO INDISPONÍVEL (só se locação NÃO for cancelada)
+	if !input.Cancelada {
+		exemplar.Disponivel = false
+		if err := database.DB.Save(&exemplar).Error; err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// 6. RECARREGAR LOCAÇÃO COMPLETA
 	database.DB.
 		Preload("Itens").
 		Preload("Itens.Exemplar").
@@ -131,7 +160,7 @@ func CreateLocacao(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------
-// ATUALIZAR
+// ATUALIZAR LOCAÇÃO
 // ---------------------------
 func UpdateLocacao(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
@@ -148,29 +177,85 @@ func UpdateLocacao(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Atualiza campos editáveis
-	locacao.DataInicio = mustParse(input.DataInicio)
-	locacao.DataFim = mustParse(input.DataFim)
-	locacao.Cancelada = input.Cancelada
-	// não alteramos ClienteID porque não muda na edição
+	// Parse datas
+	dataInicio := mustParse(input.DataInicio)
+	dataFim := mustParse(input.DataFim)
 
-	// Atualiza item
+	// Validar datas
+	if dataFim.Before(dataInicio) {
+		http.Error(w, "data_fim deve ser posterior a data_inicio", http.StatusBadRequest)
+		return
+	}
+
+	// Buscar item atual
 	var item models.ItemLocacao
 	database.DB.Where("locacao_id = ?", locacao.ID).First(&item)
 
+	// VERIFICAR SE MUDOU O STATUS DE CANCELAMENTO
+	statusCanceladoMudou := locacao.Cancelada != input.Cancelada
+
+	// Se mudou o exemplar
 	if input.ExemplarID != 0 && item.ExemplarCodigo != input.ExemplarID {
-		var exemplar models.Exemplar
+		// 1. VERIFICAR SE NOVO EXEMPLAR EXISTE
+		var novoExemplar models.Exemplar
 		if err := database.DB.Preload("Midia.ClassificacaoInterna").
-			First(&exemplar, input.ExemplarID).Error; err == nil {
-			item.ExemplarCodigo = exemplar.CodigoInterno
-			item.Valor = exemplar.Midia.ClassificacaoInterna.ValorAluguel
+			First(&novoExemplar, input.ExemplarID).Error; err != nil {
+			http.Error(w, "novo exemplar not found", http.StatusNotFound)
+			return
 		}
+
+		// 2. VERIFICAR SE NOVO EXEMPLAR ESTÁ DISPONÍVEL (só se locação NÃO for cancelada)
+		if !input.Cancelada && !novoExemplar.Disponivel {
+			http.Error(w, "novo exemplar não está disponível", http.StatusConflict)
+			return
+		}
+
+		// 3. LIBERAR EXEMPLAR ANTIGO (só se locação antiga NÃO era cancelada)
+		if !locacao.Cancelada {
+			var exemplarAntigo models.Exemplar
+			database.DB.First(&exemplarAntigo, item.ExemplarCodigo)
+			exemplarAntigo.Disponivel = true
+			database.DB.Save(&exemplarAntigo)
+		}
+
+		// 4. ATUALIZAR ITEM COM NOVO EXEMPLAR
+		item.ExemplarCodigo = novoExemplar.CodigoInterno
+		item.Valor = novoExemplar.Midia.ClassificacaoInterna.ValorAluguel
+
+		// 5. BLOQUEAR NOVO EXEMPLAR (só se locação NÃO for cancelada)
+		if !input.Cancelada {
+			novoExemplar.Disponivel = false
+			database.DB.Save(&novoExemplar)
+		}
+	} else if statusCanceladoMudou {
+		// SE MUDOU APENAS O STATUS DE CANCELAMENTO (sem trocar exemplar)
+		var exemplarAtual models.Exemplar
+		database.DB.First(&exemplarAtual, item.ExemplarCodigo)
+
+		if input.Cancelada {
+			// Estava ativa, agora foi CANCELADA → liberar exemplar
+			exemplarAtual.Disponivel = true
+		} else {
+			// Estava cancelada, agora foi ATIVADA → bloquear exemplar
+			if !exemplarAtual.Disponivel {
+				http.Error(w, "exemplar não está disponível para reativar locação", http.StatusConflict)
+				return
+			}
+			exemplarAtual.Disponivel = false
+		}
+		database.DB.Save(&exemplarAtual)
 	}
 
+	// Atualizar campos da locação
+	locacao.DataInicio = dataInicio
+	locacao.DataFim = dataFim
+	locacao.Cancelada = input.Cancelada
+
+	// Salvar alterações
 	database.DB.Save(&locacao)
 	database.DB.Save(&item)
 
-	// recarrega locação completa
+	// Recarregar locação completa
 	database.DB.
 		Preload("Itens").
 		Preload("Itens.Exemplar").
@@ -179,17 +264,78 @@ func UpdateLocacao(w http.ResponseWriter, r *http.Request) {
 		Preload("Cliente").
 		First(&locacao, id)
 
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(locacao)
 }
 
 // ---------------------------
-// DELETAR
+// DELETAR LOCAÇÃO
 // ---------------------------
 func DeleteLocacao(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(mux.Vars(r)["id"])
 
+	// Buscar locação
+	var locacao models.Locacao
+	if err := database.DB.First(&locacao, id).Error; err != nil {
+		http.Error(w, "locacao not found", http.StatusNotFound)
+		return
+	}
+
+	// Buscar itens da locação
+	var itens []models.ItemLocacao
+	database.DB.Where("locacao_id = ?", id).Find(&itens)
+
+	// Liberar exemplares (só se a locação NÃO era cancelada)
+	if !locacao.Cancelada {
+		for _, item := range itens {
+			var exemplar models.Exemplar
+			if database.DB.First(&exemplar, item.ExemplarCodigo).Error == nil {
+				exemplar.Disponivel = true
+				database.DB.Save(&exemplar)
+			}
+		}
+	}
+
+	// Deletar itens e locação
 	database.DB.Where("locacao_id = ?", id).Delete(&models.ItemLocacao{})
 	database.DB.Delete(&models.Locacao{}, id)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ---------------------------
+// REGISTRAR DEVOLUÇÃO
+// ---------------------------
+func RegistrarDevolucao(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+
+	var locacao models.Locacao
+	if err := database.DB.First(&locacao, id).Error; err != nil {
+		http.Error(w, "locacao not found", http.StatusNotFound)
+		return
+	}
+
+	// Não faz sentido devolver locação já cancelada
+	if locacao.Cancelada {
+		http.Error(w, "não é possível devolver locação cancelada", http.StatusBadRequest)
+		return
+	}
+
+	// Buscar itens da locação
+	var itens []models.ItemLocacao
+	database.DB.Where("locacao_id = ?", id).Find(&itens)
+
+	// Marcar todos os exemplares como disponíveis
+	for _, item := range itens {
+		var exemplar models.Exemplar
+		if database.DB.First(&exemplar, item.ExemplarCodigo).Error == nil {
+			exemplar.Disponivel = true
+			database.DB.Save(&exemplar)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "devolução registrada com sucesso",
+	})
 }
