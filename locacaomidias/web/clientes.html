@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clientes — Locação</title>
+  <link rel="stylesheet" href="/css/formularios.css" />
+</head>
+<body>
+  <div class="container">
+
+    <!-- HEADER ================================================================ -->
+    <div class="card header">
+      <div class="h-title">
+        <svg width="34" height="34" viewBox="0 0 24 24">
+          <circle cx="12" cy="7" r="5" fill="#2563eb"/>
+          <rect x="4" y="14" width="16" height="8" rx="4" fill="#06b6d4"/>
+        </svg>
+        <div>
+          <h1>Clientes</h1>
+          <div class="h-sub">Cadastro e gerenciamento de clientes</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btnNovo" class="btn btn-primary">Novo Cliente</button>
+      </div>
+    </div>
+
+    <!-- FORM NOVO ============================================================= -->
+    <div class="card" id="formNovo" style="display:none;">
+      <form id="novoForm">
+        <div class="form-grid">
+
+          <div class="form-row">
+            <label>Nome</label>
+            <input id="nome" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>Sobrenome</label>
+            <input id="sobrenome" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>Data de nascimento</label>
+            <input id="data_nascimento" type="date" required />
+          </div>
+
+          <div class="form-row">
+            <label>CPF</label>
+            <input id="cpf" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>Email</label>
+            <input id="email" type="email" required />
+          </div>
+
+          <div class="form-row">
+            <label>Logradouro</label>
+            <input id="logradouro" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>Número</label>
+            <input id="numero" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>Bairro</label>
+            <input id="bairro" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>CEP</label>
+            <input id="cep" type="text" required />
+          </div>
+
+          <div class="form-row">
+            <label>Cidade</label>
+            <select id="cidade_id" required></select>
+          </div>
+
+          <div class="form-row center">
+            <div class="space"></div>
+            <button type="button" id="btnCancelar" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+
+        </div>
+      </form>
+    </div>
+
+    <!-- TABELA ================================================================ -->
+    <div class="card">
+      <div class="table-wrap">
+        <table id="tableClientes">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Cidade</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL EDITAR =========================================================== -->
+  <div class="modal" id="modalEdit">
+    <div class="modal-card">
+
+      <div class="modal-head">
+        <strong>Editar Cliente</strong>
+        <button class="close" id="closeEdit">✕</button>
+      </div>
+
+      <form id="editForm">
+        <div class="form-grid">
+
+          <div class="form-row"><label>Nome</label><input id="edit_nome" type="text"></div>
+          <div class="form-row"><label>Sobrenome</label><input id="edit_sobrenome" type="text"></div>
+          <div class="form-row"><label>Data nascimento</label><input id="edit_data" type="date"></div>
+          <div class="form-row"><label>CPF</label><input id="edit_cpf" type="text"></div>
+          <div class="form-row"><label>Email</label><input id="edit_email" type="email"></div>
+          <div class="form-row"><label>Logradouro</label><input id="edit_logradouro" type="text"></div>
+          <div class="form-row"><label>Número</label><input id="edit_numero" type="text"></div>
+          <div class="form-row"><label>Bairro</label><input id="edit_bairro" type="text"></div>
+          <div class="form-row"><label>CEP</label><input id="edit_cep" type="text"></div>
+          <div class="form-row"><label>Cidade</label><select id="edit_cidade"></select></div>
+
+        </div>
+
+        <div class="mt-8" style="text-align:right;">
+          <button type="button" id="btnDelModal" class="btn btn-danger">Excluir</button>
+          <button type="button" class="btn btn-ghost" id="btnCloseModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+<script>
+const api = "/api/clientes";
+const apiCidades = "/api/cidades";
+
+let editingId = null;
+
+// Escape HTML
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+}
+
+// Carregar cidades
+async function loadCidades(){
+  const res = await fetch(apiCidades);
+  const lista = await res.json();
+
+  const selects = [ "#cidade_id", "#edit_cidade" ];
+
+  selects.forEach(sel => {
+    const s = document.querySelector(sel);
+    s.innerHTML = "<option value=''>— selecione —</option>";
+    lista.forEach(c => {
+      const o = document.createElement("option");
+      o.value = c.id;
+      o.textContent = `${c.nome} (${c.estado?.sigla || ""})`;
+      s.appendChild(o);
+    });
+  });
+}
+
+// Listar clientes
+async function loadClientes(){
+  const res = await fetch(api);
+  const data = await res.json();
+
+  const tbody = document.querySelector("#tableClientes tbody");
+  tbody.innerHTML = "";
+
+  data.forEach(c=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${c.id}</td>
+      <td><strong>${escapeHtml(c.nome)} ${escapeHtml(c.sobrenome)}</strong></td>
+      <td>${escapeHtml(c.email)}</td>
+      <td>${c.cidade?.nome || ""} - ${c.cidade?.estado?.sigla || ""}</td>
+      <td>
+        <button class="btn btn-secondary" onclick="openEdit(${c.id})">Editar</button>
+        <button class="btn btn-danger" onclick="deleteCliente(${c.id})">Excluir</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Abrir formulário novo
+document.querySelector("#btnNovo").onclick = () => {
+  document.querySelector("#formNovo").style.display = "block";
+};
+
+// Cancelar novo
+document.querySelector("#btnCancelar").onclick = () => {
+  document.querySelector("#formNovo").style.display = "none";
+};
+
+// Criar cliente
+document.querySelector("#novoForm").onsubmit = async e => {
+  e.preventDefault();
+  const payload = {
+    nome: nome.value,
+    sobrenome: sobrenome.value,
+    data_nascimento: data_nascimento.value,
+    cpf: cpf.value,
+    email: email.value,
+    logradouro: logradouro.value,
+    numero: numero.value,
+    bairro: bairro.value,
+    cep: cep.value,
+    cidade_id: Number(cidade_id.value)
+  };
+
+  const res = await fetch(api, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok){
+    formNovo.style.display = "none";
+    loadClientes();
+    e.target.reset();
+  } else {
+    alert("Erro ao criar cliente");
+  }
+};
+
+// Abrir modal edição
+async function openEdit(id){
+  const res = await fetch(api+"/"+id);
+  if(!res.ok){ alert("Não encontrado"); return; }
+
+  const c = await res.json();
+  editingId = c.id;
+
+  edit_nome.value = c.nome;
+  edit_sobrenome.value = c.sobrenome;
+  edit_data.value = c.data_nascimento?.substring(0,10) || "";
+  edit_cpf.value = c.cpf;
+  edit_email.value = c.email;
+  edit_logradouro.value = c.logradouro;
+  edit_numero.value = c.numero;
+  edit_bairro.value = c.bairro;
+  edit_cep.value = c.cep;
+  edit_cidade.value = c.cidade_id;
+
+  modalEdit.classList.add("show");
+}
+
+// Fechar modal
+closeEdit.onclick = ()=> modalEdit.classList.remove("show");
+btnCloseModal.onclick = ()=> modalEdit.classList.remove("show");
+
+// Salvar edição
+editForm.onsubmit = async e => {
+  e.preventDefault();
+
+  const payload = {
+    nome: edit_nome.value,
+    sobrenome: edit_sobrenome.value,
+    data_nascimento: edit_data.value,
+    cpf: edit_cpf.value,
+    email: edit_email.value,
+    logradouro: edit_logradouro.value,
+    numero: edit_numero.value,
+    bairro: edit_bairro.value,
+    cep: edit_cep.value,
+    cidade_id: Number(edit_cidade.value)
+  };
+
+  const res = await fetch(api+"/"+editingId,{
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+
+  if(res.ok){
+    modalEdit.classList.remove("show");
+    loadClientes();
+  } else alert("Erro ao atualizar");
+};
+
+// Excluir cliente
+async function deleteCliente(id){
+  if(!confirm("Confirma exclusão?")) return;
+
+  const res = await fetch(api+"/"+id,{method:"DELETE"});
+  if(res.ok) loadClientes();
+  else alert("Erro ao excluir");
+}
+
+// Botão excluir dentro do modal
+btnDelModal.onclick = async ()=>{
+  if(!confirm("Confirma exclusão?")) return;
+  const res = await fetch(api+"/"+editingId,{method:"DELETE"});
+  if(res.ok){
+    modalEdit.classList.remove("show");
+    loadClientes();
+  }
+};
+
+loadCidades().then(loadClientes);
+</script>
+
+</body>
+</html>

@@ -10,7 +10,6 @@ import (
 func main() {
 	// Conecta ao banco
 	database.Connect()
-
 	// Configura rotas
 	router := routes.InitRoutes()
 

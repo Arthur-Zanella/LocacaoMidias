@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Locações — Locadora</title>
+  <link rel="stylesheet" href="/css/formularios.css" />
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="card header">
+    <div class="h-title">
+      <svg width="34" height="34" viewBox="0 0 24 24">
+        <path fill="#0ea5e9" d="M4 4h16v16H4z"/>
+        <circle cx="9" cy="12" r="2.2" fill="#0284c7"/>
+      </svg>
+      <div>
+        <h1>Locações</h1>
+        <div class="h-sub">Gerencie empréstimos, devoluções e cancelamentos</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button id="btnNova" class="btn btn-primary">Nova Locação</button>
+    </div>
+  </div>
+
+  <!-- FORM NOVA LOCAÇÃO -->
+  <div class="card" id="formNova" style="display:none;">
+    <form id="novaForm">
+      <div class="form-grid">
+
+        <div class="form-row">
+          <label for="cliente_id">Cliente</label>
+          <select id="cliente_id" required></select>
+        </div>
+
+        <div class="form-row">
+          <label for="exemplar_id">Exemplar</label>
+          <select id="exemplar_id" required></select>
+        </div>
+
+        <div class="form-row">
+          <label for="data_inicio">Data início</label>
+          <input type="date" id="data_inicio" required />
+        </div>
+
+        <div class="form-row">
+          <label for="data_fim">Data fim</label>
+          <input type="date" id="data_fim" required />
+        </div>
+
+        <div class="form-row">
+          <label for="valor">Valor (automático)</label>
+          <input id="valor" type="number" readonly />
+        </div>
+
+        <div class="form-row center">
+          <button type="button" id="btnCancelForm" class="btn btn-ghost">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <!-- LISTAGEM -->
+  <div class="card">
+    <table id="tableLoc">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Cliente</th>
+          <th>Exemplar</th>
+          <th>Data Início</th>
+          <th>Data Fim</th>
+          <th>Status</th>
+          <th>Valor</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+</div>
+
+
+<!-- MODAL EDIÇÃO -->
+<div class="modal" id="modalEdit">
+  <div class="modal-card">
+
+    <div class="modal-head">
+      <strong>Editar Locação</strong>
+      <button class="close" id="closeEdit">✕</button>
+    </div>
+
+    <form id="editForm">
+      <div class="form-grid">
+
+        <div class="form-row">
+          <label>Cliente</label>
+          <select id="edit_cliente" disabled></select>
+        </div>
+
+        <div class="form-row">
+          <label>Exemplar</label>
+          <select id="edit_exemplar"></select>
+        </div>
+
+        <div class="form-row">
+          <label>Data início</label>
+          <input type="date" id="edit_inicio" />
+        </div>
+
+        <div class="form-row">
+          <label>Data fim</label>
+          <input type="date" id="edit_fim" />
+        </div>
+
+        <div class="form-row">
+          <label>Valor (automático)</label>
+          <input id="edit_valor" readonly />
+        </div>
+
+        <div class="form-row">
+          <label>Status</label>
+          <select id="edit_cancelada">
+            <option value="false">Ativa</option>
+            <option value="true">Cancelada</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div style="text-align:right;margin-top:15px;">
+        <button type="button" class="btn btn-ghost" id="btnCloseModal">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+
+
+<script>
+const api = {
+  locacoes: "/api/locacoes",
+  clientes: "/api/clientes",
+  exemplares: "/api/exemplares"
+};
+
+// Carregar selects auxiliares
+async function loadSelects() {
+  const [c, e] = await Promise.all([
+    fetch(api.clientes),
+    fetch(api.exemplares)
+  ]);
+
+  const clientes = await c.json();
+  const exemplares = await e.json();
+
+  fill("#cliente_id", clientes, c => c.nome + " " + c.sobrenome);
+  fill("#exemplar_id", exemplares, e => e.codigo_interno + " — " + (e.midia?.titulo || ""));
+
+  fill("#edit_cliente", clientes, c => c.nome + " " + c.sobrenome);
+  fill("#edit_exemplar", exemplares, e => e.codigo_interno + " — " + (e.midia?.titulo || ""));
+}
+
+function fill(sel, data, labelFn) {
+  const s = document.querySelector(sel);
+  s.innerHTML = '<option value="">— selecione —</option>';
+  data.forEach(d => {
+    const o = document.createElement("option");
+    o.value = d.id || d.codigo_interno;
+    o.textContent = labelFn(d);
+    o.dataset.valor = d.midia?.classificacao_interna?.valor_aluguel || 0;
+    s.appendChild(o);
+  });
+}
+
+// Calcular valor automático
+function setupAutoValor() {
+  document.querySelector("#exemplar_id").addEventListener("change", e => {
+    const opt = e.target.selectedOptions[0];
+    document.querySelector("#valor").value = opt.dataset.valor || 0;
+  });
+
+  document.querySelector("#edit_exemplar").addEventListener("change", e => {
+    const opt = e.target.selectedOptions[0];
+    document.querySelector("#edit_valor").value = opt.dataset.valor || 0;
+  });
+}
+
+// Fetch listagem
+async function fetchLocacoes() {
+  const res = await fetch(api.locacoes);
+  const data = await res.json();
+
+  const tbody = document.querySelector("#tableLoc tbody");
+  tbody.innerHTML = "";
+
+  data.forEach(l => {
+    const statusColor = l.cancelada ? "red" : "green";
+    const statusText = l.cancelada ? "Cancelada" : "Ativa";
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${l.id}</td>
+      <td>${l.cliente?.nome} ${l.cliente?.sobrenome}</td>
+      <td>${l.itens?.[0]?.exemplar_codigo_interno || ""}</td>
+      <td>${l.data_inicio?.substring(0,10)}</td>
+      <td>${l.data_fim?.substring(0,10)}</td>
+      <td><span style="color:${statusColor};font-weight:bold">${statusText}</span></td>
+      <td>R$ ${(l.itens?.[0]?.valor || 0).toFixed(2)}</td>
+      <td>
+        <button class="btn btn-secondary" onclick="openEdit(${l.id})">Editar</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// Abrir modal editar
+async function openEdit(id) {
+  const res = await fetch(api.locacoes + "/" + id);
+  const loc = await res.json();
+
+  editingId = loc.id;
+
+  document.querySelector("#edit_cliente").value = loc.cliente_id;
+  document.querySelector("#edit_exemplar").value = loc.itens?.[0]?.exemplar_codigo_interno;
+  document.querySelector("#edit_inicio").value = loc.data_inicio.substring(0,10);
+  document.querySelector("#edit_fim").value = loc.data_fim.substring(0,10);
+  document.querySelector("#edit_valor").value = loc.itens?.[0]?.valor || 0;
+  document.querySelector("#edit_cancelada").value = String(loc.cancelada);
+
+  document.getElementById("modalEdit").classList.add("show");
+}
+
+// Submit edição
+let editingId = null;
+
+document.querySelector("#editForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const payload = {
+    data_inicio: document.querySelector("#edit_inicio").value,
+    data_fim: document.querySelector("#edit_fim").value,
+    cancelada: document.querySelector("#edit_cancelada").value === "true",
+    exemplar_codigo_interno: Number(document.querySelector("#edit_exemplar").value)
+  };
+
+  const res = await fetch(api.locacoes + "/" + editingId, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    document.getElementById("modalEdit").classList.remove("show");
+    fetchLocacoes();
+  } else {
+    alert("Erro ao salvar.");
+  }
+});
+
+// Criar nova locação
+document.querySelector("#novaForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const payload = {
+    cliente_id: Number(document.querySelector("#cliente_id").value),
+    exemplar_codigo_interno: Number(document.querySelector("#exemplar_id").value),
+    data_inicio: document.querySelector("#data_inicio").value,
+    data_fim: document.querySelector("#data_fim").value
+  };
+
+  const res = await fetch(api.locacoes, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (res.ok) {
+    e.target.reset();  // limpa form
+    document.getElementById("formNova").style.display = "none";
+    fetchLocacoes();
+  } else {
+    alert("Erro ao criar locação.");
+  }
+});
+
+// Controles visuais
+document.querySelector("#btnNova").addEventListener("click", () => {
+  document.querySelector("#novaForm").reset();
+  document.getElementById("formNova").style.display = "block";
+});
+
+document.querySelector("#btnCancelForm").addEventListener("click", () => {
+  document.getElementById("formNova").style.display = "none";
+});
+
+document.querySelector("#closeEdit").addEventListener("click", () =>
+  document.getElementById("modalEdit").classList.remove("show")
+);
+
+document.querySelector("#btnCloseModal").addEventListener("click", () =>
+  document.getElementById("modalEdit").classList.remove("show")
+);
+
+// Inicialização
+loadSelects().then(() => {
+  setupAutoValor();
+  fetchLocacoes();
+});
+</script>
+
+</body>
+</html>

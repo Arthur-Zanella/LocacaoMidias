@@ -1,0 +1,92 @@
+/* ------------------------------
+      ESTILO DO INDEX
+------------------------------- */
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f7fa;
+    color: #333;
+}
+
+/* ====== HEADER ====== */
+.header {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 36px;
+    font-weight: bold;
+}
+
+.header p {
+    margin-top: 8px;
+    font-size: 18px;
+    opacity: 0.9;
+}
+
+/* ====== MENU ====== */
+.menu-container {
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.menu-container h2 {
+    font-size: 26px;
+    margin-bottom: 20px;
+    border-left: 6px solid #3b82f6;
+    padding-left: 10px;
+}
+
+/* GRID DE CARDS */
+.menu-grid {
+    display: grid;
+    gap: 25px;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+/* ====== CARD ====== */
+.menu-card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #333;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    transition: 0.3s ease;
+    border-left: 6px solid #3b82f6;
+}
+
+.menu-card h3 {
+    margin: 0 0 10px;
+    font-size: 22px;
+}
+
+.menu-card p {
+    margin: 0;
+    font-size: 15px;
+    opacity: 0.85;
+}
+
+/* EFEITO HOVER */
+.menu-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    border-left: 6px solid #1d4ed8;
+}
+
+/* ====== FOOTER ====== */
+.footer {
+    margin-top: 50px;
+    text-align: center;
+    padding: 20px;
+    background: #e5e7eb;
+    color: #444;
+    font-size: 14px;
+}

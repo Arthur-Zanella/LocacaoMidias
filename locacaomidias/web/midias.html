@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mídias — Locação</title>
+  <link rel="stylesheet" href="/css/formularios.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="card header">
+      <div class="h-title">
+        <svg width="34" height="34" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" fill="#2563eb"/><circle cx="9" cy="11" r="2.2" fill="#06b6d4"/></svg>
+        <div>
+          <h1>Mídias</h1>
+          <div class="h-sub">Gerencie mídias: título, gênero, classificações e atores</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btnNovo" class="btn btn-primary">Nova Mídia</button>
+      </div>
+    </div>
+
+    <!-- FORM NOVA MÍDIA -->
+    <div class="card" id="formNovo" style="display:none;">
+      <form id="novoForm">
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="titulo">Título</label>
+            <input id="titulo" name="titulo" type="text" required />
+          </div>
+          <div class="form-row">
+            <label for="ano_lancamento">Ano</label>
+            <input id="ano_lancamento" name="ano_lancamento" type="text" />
+          </div>
+          <div class="form-row">
+            <label for="codigo_barras">Código de barras</label>
+            <input id="codigo_barras" name="codigo_barras" type="text" />
+          </div>
+          <div class="form-row">
+            <label for="duracao_em_minutos">Duração (min)</label>
+            <input id="duracao_em_minutos" name="duracao_em_minutos" type="number" />
+          </div>
+
+          <!-- SELECTS PARA ATORES -->
+          <div class="form-row">
+            <label for="ator_principal">Ator Principal</label>
+            <select id="ator_principal"></select>
+          </div>
+
+          <div class="form-row">
+            <label for="ator_coadjuvante">Ator Coadjuvante</label>
+            <select id="ator_coadjuvante"></select>
+          </div>
+
+          <div class="form-row">
+            <label for="genero_id">Gênero</label>
+            <select id="genero_id"></select>
+          </div>
+          <div class="form-row">
+            <label for="classificacao_etaria_id">Classificação etária</label>
+            <select id="classificacao_etaria_id"></select>
+          </div>
+          <div class="form-row">
+            <label for="tipo_id">Tipo</label>
+            <select id="tipo_id"></select>
+          </div>
+          <div class="form-row">
+            <label for="classificacao_interna_id">Classificação interna</label>
+            <select id="classificacao_interna_id"></select>
+          </div>
+
+          <div class="form-row center">
+            <button type="button" id="btnCancelar" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- LISTAGEM -->
+    <div class="card">
+      <div class="table-wrap">
+        <table id="tableMidias">
+          <thead>
+            <tr><th>ID</th><th>Título</th><th>Gênero</th><th>Tipo</th><th>Valor</th><th>Ações</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR -->
+  <div id="modalEdit" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>Editar Mídia</strong>
+        <button class="close" id="closeEdit">✕</button>
+      </div>
+
+      <form id="editForm">
+        <div class="form-grid">
+          <div class="form-row"><label>Título</label><input id="edit_titulo" type="text"/></div>
+          <div class="form-row"><label>Ano</label><input id="edit_ano" type="text"/></div>
+          <div class="form-row"><label>Código de barras</label><input id="edit_codigo_barras" type="text"/></div>
+          <div class="form-row"><label>Duração</label><input id="edit_duracao" type="number"/></div>
+
+          <!-- NOVO: select de atores -->
+          <div class="form-row"><label>Ator Principal</label><select id="edit_ator_principal"></select></div>
+          <div class="form-row"><label>Ator Coadjuvante</label><select id="edit_ator_coadjuvante"></select></div>
+
+          <div class="form-row"><label>Gênero</label><select id="edit_genero"></select></div>
+          <div class="form-row"><label>Classificação etária</label><select id="edit_classificacao_etaria"></select></div>
+          <div class="form-row"><label>Tipo</label><select id="edit_tipo"></select></div>
+          <div class="form-row"><label>Classificação interna</label><select id="edit_classificacao_interna"></select></div>
+        </div>
+
+        <div class="mt-8" style="text-align:right">
+          <button type="button" id="btnDelModal" class="btn btn-danger">Excluir</button>
+          <button type="button" id="btnCloseModal" class="btn btn-ghost">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+const apiBase = '/api/midias';
+const aux = { 
+  generos:'/api/generos', 
+  tipos:'/api/tipos', 
+  classifs:'/api/classificacoes-etarias', 
+  intern:'/api/classificacoes-internas',
+  atores:'/api/atores'
+};
+
+async function populateSelects(){
+  const [g,t,c,i,a] = await Promise.all([
+    fetch(aux.generos),
+    fetch(aux.tipos),
+    fetch(aux.classifs),
+    fetch(aux.intern),
+    fetch(aux.atores)
+  ]);
+
+  const [gen,tip,classif,int,atores] = await Promise.all([
+    g.json(), t.json(), c.json(), i.json(), a.json()
+  ]);
+
+  fill('#genero_id', gen);
+  fill('#tipo_id', tip);
+  fill('#classificacao_etaria_id', classif);
+  fill('#classificacao_interna_id', int);
+
+  fill('#ator_principal', atores);
+  fill('#ator_coadjuvante', atores);
+
+  fill('#edit_genero', gen);
+  fill('#edit_tipo', tip);
+  fill('#edit_classificacao_etaria', classif);
+  fill('#edit_classificacao_interna', int);
+
+  fill('#edit_ator_principal', atores);
+  fill('#edit_ator_coadjuvante', atores);
+}
+
+function fill(selector, data){
+  const s = document.querySelector(selector);
+  s.innerHTML = '<option value="">— selecione —</option>';
+  data.forEach(d=>{
+    const o=document.createElement('option');
+    o.value=d.id;
+    o.textContent=d.nome || d.descricao || d.titulo;
+    s.appendChild(o);
+  });
+}
+
+async function fetchMidias(){
+  const res = await fetch(apiBase);
+  const data = await res.json();
+  const tbody = document.querySelector('#tableMidias tbody');
+  tbody.innerHTML='';
+
+  data.forEach(m=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td>${m.id}</td>
+      <td><strong>${escapeHtml(m.titulo||'')}</strong>
+      <div class="small">${escapeHtml(m.ano_lancamento||'')}</div></td>
+      <td class="small">${m.genero?.descricao||''}</td>
+      <td class="small">${m.tipo?.descricao||''}</td>
+      <td class="small">${m.classificacao_interna?.valor_aluguel 
+          ? ('R$ '+Number(m.classificacao_interna.valor_aluguel).toFixed(2))
+          : ''}</td>
+      <td>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" onclick="openEdit(${m.id})">Editar</button>
+          <button class="btn btn-danger" onclick="deleteMidia(${m.id})">Excluir</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))
+}
+
+document.getElementById('btnNovo').addEventListener('click', ()=> 
+  document.getElementById('formNovo').style.display='block'
+);
+
+document.getElementById('btnCancelar').addEventListener('click', ()=> 
+  document.getElementById('formNovo').style.display='none'
+);
+
+document.getElementById('novoForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = {
+    titulo: titulo.value,
+    ano_lancamento: ano_lancamento.value,
+    codigo_barras: codigo_barras.value,
+    duracao_em_minutos: Number(duracao_em_minutos.value||0),
+    ator_principal: Number(ator_principal.value||0),
+    ator_coadjuvante: Number(ator_coadjuvante.value||0),
+    genero_id: Number(genero_id.value||0),
+    classificacao_etaria_id: Number(classificacao_etaria_id.value||0),
+    tipo_id: Number(tipo_id.value||0),
+    classificacao_interna_id: Number(classificacao_interna_id.value||0)
+  };
+
+  const res = await fetch(apiBase,{
+    method:'POST',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify(payload)
+  });
+
+  if(res.ok){
+    document.getElementById('formNovo').style.display='none';
+    e.target.reset();
+    fetchMidias(); 
+  } else alert('Erro ao criar mídia');
+});
+
+let editingId=null;
+
+async function openEdit(id){
+  const res = await fetch(apiBase+'/'+id);
+  if(!res.ok){ alert('Não encontrado'); return; }
+  const m = await res.json();
+  editingId = m.id;
+
+  edit_titulo.value = m.titulo || '';
+  edit_ano.value = m.ano_lancamento || '';
+  edit_codigo_barras.value = m.codigo_barras || '';
+  edit_duracao.value = m.duracao_em_minutos || '';
+
+  edit_ator_principal.value = m.ator_principal_id || '';
+  edit_ator_coadjuvante.value = m.ator_coadjuvante_id || '';
+
+  edit_genero.value = m.genero_id || '';
+  edit_classificacao_etaria.value = m.classificacao_etaria_id || '';
+  edit_tipo.value = m.tipo_id || '';
+  edit_classificacao_interna.value = m.classificacao_interna_id || '';
+
+  document.getElementById('modalEdit').classList.add('show');
+}
+
+document.getElementById('closeEdit').addEventListener('click', ()=> 
+  document.getElementById('modalEdit').classList.remove('show')
+);
+document.getElementById('btnCloseModal').addEventListener('click', ()=> 
+  document.getElementById('modalEdit').classList.remove('show')
+);
+
+document.getElementById('editForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+
+  const payload = {
+    titulo: edit_titulo.value,
+    ano_lancamento: edit_ano.value,
+    codigo_barras: edit_codigo_barras.value,
+    duracao_em_minutos: Number(edit_duracao.value||0),
+    ator_principal: Number(edit_ator_principal.value||0),
+    ator_coadjuvante: Number(edit_ator_coadjuvante.value||0),
+    genero_id: Number(edit_genero.value||0),
+    classificacao_etaria_id: Number(edit_classificacao_etaria.value||0),
+    tipo_id: Number(edit_tipo.value||0),
+    classificacao_interna_id: Number(edit_classificacao_interna.value||0)
+  };
+
+  const res = await fetch(apiBase+'/'+editingId,{
+    method:'PUT',
+    headers:{ 'Content-Type':'application/json' },
+    body:JSON.stringify(payload)
+  });
+
+  if(res.ok){
+    document.getElementById('modalEdit').classList.remove('show');
+    fetchMidias();
+  } else alert('Erro ao salvar');
+});
+
+async function deleteMidia(id){
+  if(!confirm('Confirma exclusão?')) return;
+
+  const res = await fetch(apiBase+'/'+id,{method:'DELETE'});
+  if(res.ok) fetchMidias();
+  else alert('Erro ao excluir');
+}
+
+document.getElementById('btnDelModal').addEventListener('click', async()=>{
+  if(!editingId) return;
+  if(!confirm('Confirma exclusão?')) return;
+
+  const res = await fetch(apiBase+'/'+editingId,{method:'DELETE'});
+  if(res.ok){
+    document.getElementById('modalEdit').classList.remove('show');
+    fetchMidias();
+  } else alert('Erro ao excluir');
+});
+
+populateSelects().then(fetchMidias);
+</script>
+</body>
+</html>

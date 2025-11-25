@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Exemplares — Locação</title>
+  <link rel="stylesheet" href="/css/formularios.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="card header">
+      <div class="h-title">
+        <svg width="34" height="34" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" fill="#06b6d4"/></svg>
+        <div>
+          <h1>Exemplares</h1>
+          <div class="h-sub">Gerencie exemplares vinculados a mídias</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="btnNovo" class="btn btn-primary">Novo Exemplar</button>
+      </div>
+    </div>
+
+    <div class="card" id="formNovo" style="display:none;">
+      <form id="novoForm">
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="midia_id">Mídia (ID)</label>
+            <select id="midia_id"></select>
+          </div>
+          <div class="form-row">
+            <label for="disponivel">Disponível</label>
+            <select id="disponivel"><option value="1">Sim</option><option value="0">Não</option></select>
+          </div>
+          <div class="form-row center">
+            <div class="space"></div>
+            <button type="button" id="btnCancelar" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="table-wrap">
+        <table id="tableExemplares">
+          <thead><tr><th>ID</th><th>Mídia</th><th>Disponível</th><th>Ações</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- modal -->
+  <div id="modalEdit" class="modal"><div class="modal-card">
+    <div class="modal-head"><strong>Editar Exemplar</strong><button class="close" id="closeEdit">✕</button></div>
+    <form id="editForm">
+      <div class="form-grid">
+        <div class="form-row"><label>Mídia</label><select id="edit_midia"></select></div>
+        <div class="form-row"><label>Disponível</label><select id="edit_disponivel"><option value="1">Sim</option><option value="0">Não</option></select></div>
+      </div>
+      <div class="mt-8" style="text-align:right">
+        <button type="button" id="btnDelModal" class="btn btn-danger">Excluir</button>
+        <button type="button" id="btnCloseModal" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div></div>
+
+<script>
+const apiBase = '/api/exemplares';
+const midiaApi = '/api/midias';
+
+async function populateMidias(){
+  const res = await fetch(midiaApi);
+  const list = await res.json();
+  const select = document.getElementById('midia_id'); const edit = document.getElementById('edit_midia');
+  [select, edit].forEach(s=>{
+    s.innerHTML = '<option value="">— selecione —</option>';
+    list.forEach(m => { const o=document.createElement('option'); o.value=m.id; o.textContent = m.titulo; s.appendChild(o); });
+  });
+}
+
+async function fetchExemplares(){
+  const res = await fetch(apiBase);
+  const data = await res.json();
+  const tbody = document.querySelector('#tableExemplares tbody'); tbody.innerHTML='';
+  data.forEach(e=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>${e.codigo_interno}</td>
+      <td><strong>${escapeHtml(e.midia?.titulo||'')}</strong></td>
+      <td>${e.disponivel ? '<span class="badge available">Sim</span>' : '<span class="badge unavailable">Não</span>'}</td>
+      <td><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="openEdit(${e.codigo_interno})">Editar</button><button class="btn btn-danger" onclick="deleteExemplar(${e.codigo_interno})">Excluir</button></div></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+document.getElementById('btnNovo').addEventListener('click', ()=> document.getElementById('formNovo').style.display='block');
+document.getElementById('btnCancelar').addEventListener('click', ()=> document.getElementById('formNovo').style.display='none');
+
+document.getElementById('novoForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = { disponivel: document.getElementById('disponivel').value === "1", midia_id: Number(document.getElementById('midia_id').value||0) };
+  const res = await fetch(apiBase, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(res.ok){ document.getElementById('formNovo').style.display='none'; e.target.reset(); fetchExemplares(); } else alert('Erro ao criar exemplar');
+});
+
+let editingId = null;
+async function openEdit(id){
+  const res = await fetch(apiBase + '/' + id);
+  if(!res.ok){ alert('Não encontrado'); return; }
+  const e = await res.json(); editingId = e.codigo_interno;
+  document.getElementById('edit_midia').value = e.midia_id || '';
+  document.getElementById('edit_disponivel').value = e.disponivel ? "1" : "0";
+  document.getElementById('modalEdit').classList.add('show');
+}
+
+document.getElementById('closeEdit').addEventListener('click', ()=> document.getElementById('modalEdit').classList.remove('show'));
+document.getElementById('btnCloseModal').addEventListener('click', ()=> document.getElementById('modalEdit').classList.remove('show'));
+
+document.getElementById('editForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = { disponivel: document.getElementById('edit_disponivel').value === "1", midia_id: Number(document.getElementById('edit_midia').value||0) };
+  const res = await fetch(apiBase + '/' + editingId, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(res.ok){ document.getElementById('modalEdit').classList.remove('show'); fetchExemplares(); } else alert('Erro ao salvar');
+});
+
+async function deleteExemplar(id){
+  if(!confirm('Confirma exclusão?')) return;
+  const res = await fetch(apiBase + '/' + id, {method:'DELETE'});
+  if(res.ok) fetchExemplares(); else alert('Erro ao excluir');
+}
+
+document.getElementById('btnDelModal').addEventListener('click', async ()=>{
+  if(!editingId) return;
+  if(!confirm('Confirma exclusão?')) return;
+  const res = await fetch(apiBase + '/' + editingId, {method:'DELETE'});
+  if(res.ok){ document.getElementById('modalEdit').classList.remove('show'); fetchExemplares(); } else alert('Erro ao excluir');
+});
+
+populateMidias().then(fetchExemplares);
+</script>
+</body>
+</html>

@@ -1,25 +1,187 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <title>Locação de Mídias</title>
-    <link rel="stylesheet" href="/css/style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Atores — Locação</title>
+  <link rel="stylesheet" href="/css/formularios.css" />
 </head>
 <body>
+  <div class="container">
+    <div class="card header">
+      <div class="h-title">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4z" fill="#2563eb"/><path d="M4 20c0-2.21 3.582-4 8-4s8 1.79 8 4v1H4v-1z" fill="#06b6d4"/></svg>
+        <div>
+          <h1>Atores</h1>
+          <div class="h-sub">Gerencie atores — criar, editar e excluir</div>
+        </div>
+      </div>
 
-<header>
-    <h1>Locação de Mídias</h1>
+      <div class="btn-row">
+        <button id="btnNovo" class="btn btn-primary"><span class="ico">＋</span>Novo Ator</button>
+      </div>
+    </div>
 
-    <nav>
-        <ul>
-            <li><a href="/atores.html">Atores</a></li>
-            <li><a href="/midias.html">Mídias</a></li>
-            <li><a href="/exemplares.html">Exemplares</a></li>
-            <li><a href="/clientes.html">Clientes</a></li>
-            <li><a href="/locacoes.html">Locações</a></li>
-        </ul>
-    </nav>
-</header>
+    <!-- Formulário de novo (compacto) -->
+    <div class="card" id="formNovo" style="display:none;">
+      <form id="novoForm">
+        <div class="form-grid">
+          <div class="form-row">
+            <label for="nome">Nome</label>
+            <input id="nome" name="nome" type="text" required />
+          </div>
+          <div class="form-row">
+            <label for="sobrenome">Sobrenome</label>
+            <input id="sobrenome" name="sobrenome" type="text" />
+          </div>
+          <div class="form-row">
+            <label for="data_estreia">Data de estreia</label>
+            <input id="data_estreia" name="data_estreia" type="date" />
+          </div>
+          <div class="form-row center">
+            <div class="space"></div>
+            <button type="button" id="btnCancelar" class="btn btn-ghost">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </div>
+      </form>
+    </div>
 
+    <!-- Listagem -->
+    <div class="card">
+      <div class="table-wrap">
+        <table id="tableAtores">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nome</th>
+              <th>Data de estreia</th>
+              <th class="center">Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de edição -->
+  <div id="modalEdit" class="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong>Editar Ator</strong>
+        <button class="close" id="closeEdit">✕</button>
+      </div>
+      <form id="editForm">
+        <div class="form-grid">
+          <div class="form-row">
+            <label>Nome</label>
+            <input id="edit_nome" type="text" />
+          </div>
+          <div class="form-row">
+            <label>Sobrenome</label>
+            <input id="edit_sobrenome" type="text" />
+          </div>
+          <div class="form-row">
+            <label>Data de estreia</label>
+            <input id="edit_data_estreia" type="date" />
+          </div>
+        </div>
+        <div class="mt-8" style="text-align:right">
+          <button type="button" id="btnDelModal" class="btn btn-danger">Excluir</button>
+          <button type="button" id="btnCloseModal" class="btn btn-ghost">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar mudanças</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+const apiBase = '/api/atores';
+
+async function fetchAtores(){
+  const res = await fetch(apiBase);
+  const data = await res.json();
+  const tbody = document.querySelector('#tableAtores tbody');
+  tbody.innerHTML = '';
+  data.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${a.id}</td>
+      <td><strong>${escapeHtml(a.nome || '')}</strong><div class="small">${escapeHtml(a.sobrenome || '')}</div></td>
+      <td class="small">${a.data_estreia || ''}</td>
+      <td>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary" data-id="${a.id}" onclick="openEdit(${a.id})">Editar</button>
+          <button class="btn btn-danger" onclick="deleteAtor(${a.id})">Excluir</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+document.getElementById('btnNovo').addEventListener('click', ()=> {
+  document.getElementById('formNovo').style.display = 'block';
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+document.getElementById('btnCancelar').addEventListener('click', ()=> {
+  document.getElementById('formNovo').style.display = 'none';
+});
+
+document.getElementById('novoForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const payload = {
+    nome: document.getElementById('nome').value,
+    sobrenome: document.getElementById('sobrenome').value,
+    data_estreia: document.getElementById('data_estreia').value
+  };
+  const res = await fetch(apiBase, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(res.ok){ document.getElementById('formNovo').style.display='none'; e.target.reset(); fetchAtores(); }
+  else{ alert('Erro ao criar ator'); }
+});
+
+let editingId = null;
+async function openEdit(id){
+  const res = await fetch(apiBase + '/' + id);
+  if(!res.ok){ alert('Ator não encontrado'); return; }
+  const a = await res.json();
+  editingId = a.id;
+  document.getElementById('edit_nome').value = a.nome || '';
+  document.getElementById('edit_sobrenome').value = a.sobrenome || '';
+  document.getElementById('edit_data_estreia').value = a.data_estreia ? a.data_estreia.split('T')[0] : '';
+  document.getElementById('modalEdit').classList.add('show');
+}
+
+document.getElementById('closeEdit').addEventListener('click', ()=> document.getElementById('modalEdit').classList.remove('show'));
+document.getElementById('btnCloseModal').addEventListener('click', ()=> document.getElementById('modalEdit').classList.remove('show'));
+document.getElementById('editForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = {
+    nome: document.getElementById('edit_nome').value,
+    sobrenome: document.getElementById('edit_sobrenome').value,
+    data_estreia: document.getElementById('edit_data_estreia').value
+  };
+  const res = await fetch(apiBase + '/' + editingId, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(res.ok){ document.getElementById('modalEdit').classList.remove('show'); fetchAtores(); }
+  else alert('Erro ao salvar');
+});
+
+async function deleteAtor(id){
+  if(!confirm('Confirma exclusão do ator?')) return;
+  const res = await fetch(apiBase + '/' + id, {method:'DELETE'});
+  if(res.ok){ fetchAtores(); } else alert('Erro ao excluir');
+}
+
+document.getElementById('btnDelModal').addEventListener('click', async ()=>{
+  if(!editingId) return;
+  if(!confirm('Confirma exclusão do ator?')) return;
+  const res = await fetch(apiBase + '/' + editingId, {method:'DELETE'});
+  if(res.ok){ document.getElementById('modalEdit').classList.remove('show'); fetchAtores(); } else alert('Erro ao excluir');
+});
+
+fetchAtores();
+</script>
 </body>
 </html>
